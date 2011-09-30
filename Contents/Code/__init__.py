@@ -78,6 +78,7 @@ def MainMenu():
 	dir.Append(Function(PopupDirectoryItem(SortOrderSubMenu, L('Solo Girls')), url=EPORNER_SOLOGIRLS, mainTitle='Solo Girls'))
 	dir.Append(Function(DirectoryItem(CategoriesMenu, L('Categories'))))
 	dir.Append(Function(InputDirectoryItem(Search, L('Search'), L('Search'), thumb=R(ICON)), url=EPORNER_KEYWORDS))
+	dir.Append(Function(DirectoryItem(FavoriteVideos, L('Favorites'))))
 	return dir
 
 def CategoriesMenu(sender):
@@ -101,9 +102,6 @@ def MovieList(sender,url,mainTitle='',searchQuery='',pageFormat='normal',sortOrd
 	pageP = page+1
 
 	dir = MediaContainer(viewMode = "List", title2 = mainTitle+' | Page: '+str(pageShow))
-#	dir = MediaContainer(viewMode = "List", title2 = mainTitle+' | Page: '+str(pageShow), replaceParent = (page>0))
-#	if page>0:
-#		dir.Append(Function(DirectoryItem(MovieList, L('+++Previous Page ('+str(pageShowM)+')+++')), url=url, mainTitle=mainTitle, searchQuery=searchQuery, pageFormat=pageFormat, sortOrder=sortOrder, page=pageM))
 	if pageFormat == 'keywords':
 		pageContent = HTML.ElementFromURL(url % (searchQuery, str(page), sortOrder))
 	else:
@@ -127,15 +125,16 @@ def MovieList(sender,url,mainTitle='',searchQuery='',pageFormat='normal',sortOrd
 		try: videoItemViews = 'Views: '+videoItem.xpath('div[@class="mbvie"]/text()')[0].strip()
 		except: pass
 		#Log(videoItemTitle+'__'+videoItemID+'__'+videoItemURL+'__'+videoItemThumb+'__'+str(videoItemDuration)+'__'+videoItemViews)
-		dir.Append(Function(PopupDirectoryItem(VideoSubMenu, title=videoItemTitle, duration=videoItemDuration, summary=videoItemViews, thumb=Function(Thumb, url=videoItemThumb)), id=videoItemID, title=videoItemTitle, url=videoItemURL))
+		dir.Append(Function(PopupDirectoryItem(VideoSubMenu, title=videoItemTitle, duration=videoItemDuration, summary=videoItemViews, thumb=Function(Thumb, url=videoItemThumb)), id=videoItemID, title=videoItemTitle, url=videoItemURL, thumb=videoItemThumb))
 	if len(pageContent.xpath('//div[@class="numlist2"]/a/span[contains(text(),'+str(pageShowP)+')]')) > 0:
 		dir.Append(Function(DirectoryItem(MovieList, L('+++Next Page ('+str(pageShowP)+')+++')), url=url, mainTitle=mainTitle, searchQuery=searchQuery, pageFormat=pageFormat, sortOrder=sortOrder, page=pageP))
 	return dir
 
-def VideoSubMenu(sender,id,title,url):
+def VideoSubMenu(sender,id,title,url,thumb):
 	dir = MediaContainer()
 	dir.Append(Function(VideoItem(PlayVideo,L('Play Video')), id=id, start=0))
-	dir.Append(Function(DirectoryItem(VideoSceneSelect, L('Scene Select'), ''), id=id, title=title, url=url))
+	dir.Append(Function(DirectoryItem(VideoSceneSelect, L('Scene Select'), ''), id=id, title=title, url=url, thumb=thumb))
+	dir.Append(Function(DirectoryItem(AddVideoToFavorites, L('Add to Favorites'), ''), id=id, title=title, url=url, thumb=thumb))
 	return dir
 
 def SortOrderSubMenu(sender,url,mainTitle,searchQuery='',pageFormat='normal'):
@@ -151,10 +150,11 @@ def SortOrderSubMenu(sender,url,mainTitle,searchQuery='',pageFormat='normal'):
 	dir.Append(Function(DirectoryItem(MovieList, L('Shortest')), url=url, mainTitle=mainTitle, searchQuery=searchQuery, pageFormat=pageFormat, sortOrder='shortest'))
 	return dir
 
-def VideoSceneSelect(sender,id,title,url):
+def VideoSceneSelect(sender,id,title,url,thumb):
 	dir = MediaContainer(title2 = title)
 	pageVSSContent = HTML.ElementFromURL(url)
 	sceneNo = 0
+	dir.Append(Function(VideoItem(PlayVideo, title='Start from the Beginning', duration=0, thumb=Function(Thumb, url=thumb)), id=id, start=0))
 	for videoVSSItem in pageVSSContent.xpath('//div[@id="cutscenes"]/div[@class="cutscenesbox"]'):
 		sceneNo = sceneNo+1
 		videoVSSItemTitle = 'Scene No. '+str(sceneNo)
@@ -171,6 +171,42 @@ def VideoSceneSelect(sender,id,title,url):
 		#Log(videoVSSItemTitle+'__'+str(videoVSSItemID)+'__'+str(videoVSSItemDurationSec)+'__'+videoVSSItemThumb)
 		dir.Append(Function(VideoItem(PlayVideo, title=videoVSSItemTitle, duration=videoVSSItemDuration, thumb=Function(Thumb, url=videoVSSItemThumb)), id=videoVSSItemID, start=videoVSSItemDurationSec))
 	return dir
+
+####################################################################################################
+def AddVideoToFavorites(sender,id,title,url,thumb):
+	favs = {}
+	if Data.Exists('favoritevideos'):
+		favs = Data.LoadObject('favoritevideos')
+		if id in favs:
+			return MessageContainer('Already a Favorite', 'This Video is already on your list of Favorites.')
+	favs[id] = [id, title, url, thumb]
+	Data.SaveObject('favoritevideos', favs)
+	return MessageContainer('Added to Favorites', 'This Video has been added to your Favorites.')
+
+def RemoveVideoFromFavorites(sender,id):
+	favs = Data.LoadObject('favoritevideos')
+	if id in favs:
+		del favs[id]
+		Data.SaveObject('favoritevideos', favs)
+		return MessageContainer('Removed from Favorites', 'This Video has been removed from your Favorites.')
+
+def FavoriteVideos(sender):
+	dir = MediaContainer(viewMode = "List", title2 = 'Favorites', noCache=True)
+	favs = Data.LoadObject('favoritevideos')
+	values = favs.values()
+	output = [(f[1], f[0], f[2], f[3]) for f in values]
+	output.sort()
+	for title, id, url, thumb in output:
+		dir.Append(Function(PopupDirectoryItem(FavoritesSubMenu, title=title, thumb=Function(Thumb, url=thumb)), id=id, title=title, url=url, thumb=thumb))
+	return dir
+
+def FavoritesSubMenu(sender,id,title,url,thumb):
+	dir = MediaContainer()
+	dir.Append(Function(VideoItem(PlayVideo,L('Play Video')), id=id, start=0))
+	dir.Append(Function(DirectoryItem(VideoSceneSelect, L('Scene Select'), ''), id=id, title=title, url=url, thumb=thumb))
+	dir.Append(Function(DirectoryItem(RemoveVideoFromFavorites, L('Remove from Favorites'), ''), id=id))
+	return dir
+####################################################################################################
 
 def Search(sender,url,query='',mainTitle='Search',pageFormat='keywords'):
 	dir = MediaContainer()
