@@ -65,6 +65,15 @@ def GetDurationFromString(duration):
 	except:
 		return 0
 
+def msToRuntime(ms):
+	if ms is None or ms <= 0:
+		return None
+	ret = []
+	sec = int(ms/1000) % 60
+	min = int(ms/1000/60) % 60
+	hr  = int(ms/1000/60/60)
+	return "%02d:%02d:%02d" % (hr,min,sec)
+
 ####################################################################################################
 
 def MainMenu():
@@ -125,7 +134,7 @@ def MovieList(sender,url,mainTitle='',searchQuery='',pageFormat='normal',sortOrd
 		try: videoItemViews = 'Views: '+videoItem.xpath('div[@class="mbvie"]/text()')[0].strip()
 		except: pass
 		#Log(videoItemTitle+'__'+videoItemID+'__'+videoItemURL+'__'+videoItemThumb+'__'+str(videoItemDuration)+'__'+videoItemViews)
-		dir.Append(Function(PopupDirectoryItem(VideoSubMenu, title=videoItemTitle, duration=videoItemDuration, summary=videoItemViews, thumb=Function(Thumb, url=videoItemThumb)), id=videoItemID, title=videoItemTitle, url=videoItemURL, thumb=videoItemThumb))
+		dir.Append(Function(PopupDirectoryItem(VideoSubMenu, title=videoItemTitle, duration=videoItemDuration, summary=videoItemViews, thumb=Function(Thumb, url=videoItemThumb), infoLabel=Function(msToRuntime, ms=videoItemDuration)), id=videoItemID, title=videoItemTitle, url=videoItemURL, thumb=videoItemThumb))
 	if len(pageContent.xpath('//div[@class="numlist2"]/a/span[contains(text(),'+str(pageShowP)+')]')) > 0:
 		dir.Append(Function(DirectoryItem(MovieList, L('+++Next Page ('+str(pageShowP)+')+++')), url=url, mainTitle=mainTitle, searchQuery=searchQuery, pageFormat=pageFormat, sortOrder=sortOrder, page=pageP))
 	return dir
